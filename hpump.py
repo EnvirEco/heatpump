@@ -32,6 +32,9 @@ print(f"   Time periods: {df['yearmonth'].min()} to {df['yearmonth'].max()}")
 # Convert yearmonth to datetime
 df['yearmonth'] = pd.to_datetime(df['yearmonth'])
 
+# Ensure province-month ordering for lag calculations later
+df = df.sort_values(['province', 'yearmonth'])
+
 # ============================================================
 # SECTION 2: CREATE ANALYSIS VARIABLES
 # ============================================================
@@ -186,6 +189,71 @@ if pval_gas < 0.05:
     print("✓ Natural gas prices significantly affect heat pump adoption")
 else:
     print("✗ Natural gas prices not significant")
+
+# ============================================================
+# SECTION 4B: LAGGED SUBSIDY MODEL (3-MONTH AVERAGE)
+# ============================================================
+
+print("\n" + "="*70)
+print("MODEL 1C: LAGGED SUBSIDY (3-MONTH AVG) WITH FUEL PRICES")
+print("="*70)
+
+# Create lagged subsidy using a 3-month rolling average, then lag by one period
+df_lag = df_panel.sort_index().copy()
+df_lag['lagged_subsidy_k_3m_avg'] = (
+    df_lag.groupby(level='province')['total_baseline_subsidy_k']
+    .rolling(3)
+    .mean()
+    .shift(1)
+    .reset_index(level=0, drop=True)
+)
+
+# Drop initial months without a full lagged window or needed covariates
+lagged_required_cols = [
+    'lagged_subsidy_k_3m_avg',
+    'total_shipments',
+    'oil_to_electric_ratio',
+    'natgas_to_electric_ratio'
+]
+df_lag_clean = df_lag.dropna(subset=lagged_required_cols)
+
+print(f"Lagged model sample size: {len(df_lag_clean)} observations")
+
+endog_1c = df_lag_clean['total_shipments']
+exog_1c = df_lag_clean[[
+    'lagged_subsidy_k_3m_avg',
+    'oil_to_electric_ratio',
+    'natgas_to_electric_ratio'
+]].copy()
+exog_1c = sm.add_constant(exog_1c, prepend=False)
+
+model_1c = PanelOLS(
+    endog_1c,
+    exog_1c,
+    entity_effects=True,
+    time_effects=True,
+    drop_absorbed=True
+).fit(cov_type='clustered', cluster_entity=True)
+
+print(model_1c.summary)
+
+coef_1c = model_1c.params['lagged_subsidy_k_3m_avg']
+pval_1c = model_1c.pvalues['lagged_subsidy_k_3m_avg']
+rsq_1c = model_1c.rsquared
+
+print(f"\nLagged Subsidy Results (Model 1C):")
+print(f"  Lagged subsidy coefficient: {coef_1c:.2f} (p={pval_1c:.4f})")
+print(f"  R-squared: {rsq_1c:.4f}")
+
+print("\nCOEFFICIENT COMPARISON (Current vs. Lagged Subsidy):")
+print(f"  Current subsidy (Model 1B): {coef_1b:.2f}")
+print(f"  Lagged subsidy  (Model 1C): {coef_1c:.2f}")
+if coef_1c > coef_1b:
+    print("  → Lagged effect is stronger, suggesting shipments respond with delay")
+elif coef_1c < coef_1b:
+    print("  → Smaller lagged effect, indicating quicker subsidy pass-through")
+else:
+    print("  → Effects are similar across timing assumptions")
 
 # ============================================================
 # SECTION 5: DUCTED SYSTEMS WITH FUEL PRICES
@@ -348,6 +416,7 @@ results_summary = pd.DataFrame({
     'Model': [
         '1A. Total Shipments (No Fuel Prices)',
         '1B. Total Shipments (With Fuel Prices)',
+        '1C. Total Shipments (Lagged Subsidy)',
         '2. Ducted Shipments (With Fuel Prices)',
         '3. Interaction (Subsidy × Oil Price)',
         '4. Atlantic Heterogeneity',
@@ -356,6 +425,7 @@ results_summary = pd.DataFrame({
     'Subsidy_Coefficient': [
         coef_1a,
         coef_1b,
+        coef_1c,
         coef_2_sub,
         model_3.params['total_baseline_subsidy_k'],
         model_4.params['total_baseline_subsidy_k'],
@@ -364,6 +434,7 @@ results_summary = pd.DataFrame({
     'Subsidy_PValue': [
         pval_1a,
         pval_1b,
+        pval_1c,
         pval_2_sub,
         model_3.pvalues['total_baseline_subsidy_k'],
         model_4.pvalues['total_baseline_subsidy_k'],
@@ -372,6 +443,7 @@ results_summary = pd.DataFrame({
     'Oil_Price_Coef': [
         np.nan,
         coef_oil,
+        np.nan,
         model_2.params['oil_to_electric_ratio'],
         model_3.params['oil_to_electric_ratio'],
         model_4.params['oil_to_electric_ratio'],
@@ -380,6 +452,7 @@ results_summary = pd.DataFrame({
     'Oil_Price_PValue': [
         np.nan,
         pval_oil,
+        np.nan,
         model_2.pvalues['oil_to_electric_ratio'],
         model_3.pvalues['oil_to_electric_ratio'],
         model_4.pvalues['oil_to_electric_ratio'],
@@ -388,6 +461,7 @@ results_summary = pd.DataFrame({
     'R_Squared': [
         rsq_1a,
         rsq_1b,
+        rsq_1c,
         rsq_2,
         model_3.rsquared,
         model_4.rsquared,
@@ -396,6 +470,7 @@ results_summary = pd.DataFrame({
     'N_Obs': [
         model_1a.nobs,
         model_1b.nobs,
+        model_1c.nobs,
         model_2.nobs,
         model_3.nobs,
         model_4.nobs,
@@ -470,6 +545,14 @@ print(f"   Original (no fuel prices): Coef={coef_1a:.1f}, p={pval_1a:.4f}, R²={
 print(f"   With fuel prices:          Coef={coef_1b:.1f}, p={pval_1b:.4f}, R²={rsq_1b:.4f}")
 print(f"   → Coefficient changed by {((coef_1b/coef_1a)-1)*100:+.1f}%")
 print(f"   → Model fit improved significantly")
+
+print(f"\n6. POLICY TIMING WITH LAGGED SUBSIDIES:")
+print(f"   Lagged 3-month avg subsidy coefficient: {coef_1c:.1f} (p={pval_1c:.4f})")
+print(f"   Lagged model R²: {rsq_1c:.4f} using {model_1c.nobs} observations")
+if coef_1c > coef_1b:
+    print("   → Stronger lagged effect suggests shipments respond with implementation delays")
+else:
+    print("   → Similar or smaller lagged effect suggests faster subsidy pass-through")
 
 print("\n" + "="*70)
 print("BOTTOM LINE:")
