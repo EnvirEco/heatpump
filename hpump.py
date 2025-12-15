@@ -546,6 +546,10 @@ print(f"   With fuel prices:          Coef={coef_1b:.1f}, p={pval_1b:.4f}, R²={
 print(f"   → Coefficient changed by {((coef_1b/coef_1a)-1)*100:+.1f}%")
 print(f"   → Model fit improved significantly")
 
+print("\n   UNITS PER $1K SUBSIDY (FOR QUICK COMPARISON):")
+print(f"   Original model: {coef_1a:.2f} units per $1k subsidy")
+print(f"   With fuel prices: {coef_1b:.2f} units per $1k subsidy")
+
 print(f"\n6. POLICY TIMING WITH LAGGED SUBSIDIES:")
 print(f"   Lagged 3-month avg subsidy coefficient: {coef_1c:.1f} (p={pval_1c:.4f})")
 print(f"   Lagged model R²: {rsq_1c:.4f} using {model_1c.nobs} observations")
