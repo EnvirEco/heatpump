@@ -256,6 +256,68 @@ else:
     print("  → Effects are similar across timing assumptions")
 
 # ============================================================
+# SECTION 4C: 1-MONTH LAGGED SUBSIDY MODEL
+# ============================================================
+
+print("\n" + "="*70)
+print("MODEL 1D: 1-MONTH LAGGED SUBSIDY WITH FUEL PRICES")
+print("="*70)
+
+df_lag_1m = df_panel.sort_index().copy()
+df_lag_1m['lagged_subsidy_k_1m'] = (
+    df_lag_1m.groupby(level='province')['total_baseline_subsidy_k']
+    .shift(1)
+    .reset_index(level=0, drop=True)
+)
+
+lagged_1m_cols = [
+    'lagged_subsidy_k_1m',
+    'total_shipments',
+    'oil_to_electric_ratio',
+    'natgas_to_electric_ratio'
+]
+df_lag_1m_clean = df_lag_1m.dropna(subset=lagged_1m_cols)
+
+print(f"1-month lag model sample size: {len(df_lag_1m_clean)} observations")
+
+endog_1d = df_lag_1m_clean['total_shipments']
+exog_1d = df_lag_1m_clean[[
+    'lagged_subsidy_k_1m',
+    'oil_to_electric_ratio',
+    'natgas_to_electric_ratio'
+]].copy()
+exog_1d = sm.add_constant(exog_1d, prepend=False)
+
+model_1d = PanelOLS(
+    endog_1d,
+    exog_1d,
+    entity_effects=True,
+    time_effects=True,
+    drop_absorbed=True
+).fit(cov_type='clustered', cluster_entity=True)
+
+print(model_1d.summary)
+
+coef_1d = model_1d.params['lagged_subsidy_k_1m']
+pval_1d = model_1d.pvalues['lagged_subsidy_k_1m']
+rsq_1d = model_1d.rsquared
+
+print(f"\nLagged Subsidy Results (Model 1D):")
+print(f"  Lagged subsidy coefficient (t-1): {coef_1d:.2f} (p={pval_1d:.4f})")
+print(f"  R-squared: {rsq_1d:.4f}")
+
+print("\nSubsidy Timing Comparison:")
+print(f"  Current subsidy (Model 1B): {coef_1b:.2f}")
+print(f"  1-month lag (Model 1D):     {coef_1d:.2f}")
+print(f"  3-month avg lag (Model 1C): {coef_1c:.2f}")
+if coef_1d > coef_1c and coef_1d < coef_1b:
+    print("  → One-month lag sits between contemporaneous and 3-month average effects")
+elif coef_1d >= coef_1b:
+    print("  → Near-contemporaneous response suggests rapid pickup after policy changes")
+else:
+    print("  → Smaller 1-month response points to longer adjustment periods")
+
+# ============================================================
 # SECTION 5: DUCTED SYSTEMS WITH FUEL PRICES
 # ============================================================
 
@@ -417,6 +479,7 @@ results_summary = pd.DataFrame({
         '1A. Total Shipments (No Fuel Prices)',
         '1B. Total Shipments (With Fuel Prices)',
         '1C. Total Shipments (Lagged Subsidy)',
+        '1D. Total Shipments (1-Month Lag)',
         '2. Ducted Shipments (With Fuel Prices)',
         '3. Interaction (Subsidy × Oil Price)',
         '4. Atlantic Heterogeneity',
@@ -426,6 +489,7 @@ results_summary = pd.DataFrame({
         coef_1a,
         coef_1b,
         coef_1c,
+        coef_1d,
         coef_2_sub,
         model_3.params['total_baseline_subsidy_k'],
         model_4.params['total_baseline_subsidy_k'],
@@ -435,6 +499,7 @@ results_summary = pd.DataFrame({
         pval_1a,
         pval_1b,
         pval_1c,
+        pval_1d,
         pval_2_sub,
         model_3.pvalues['total_baseline_subsidy_k'],
         model_4.pvalues['total_baseline_subsidy_k'],
@@ -443,6 +508,7 @@ results_summary = pd.DataFrame({
     'Oil_Price_Coef': [
         np.nan,
         coef_oil,
+        np.nan,
         np.nan,
         model_2.params['oil_to_electric_ratio'],
         model_3.params['oil_to_electric_ratio'],
@@ -453,6 +519,7 @@ results_summary = pd.DataFrame({
         np.nan,
         pval_oil,
         np.nan,
+        np.nan,
         model_2.pvalues['oil_to_electric_ratio'],
         model_3.pvalues['oil_to_electric_ratio'],
         model_4.pvalues['oil_to_electric_ratio'],
@@ -462,6 +529,7 @@ results_summary = pd.DataFrame({
         rsq_1a,
         rsq_1b,
         rsq_1c,
+        rsq_1d,
         rsq_2,
         model_3.rsquared,
         model_4.rsquared,
@@ -471,6 +539,7 @@ results_summary = pd.DataFrame({
         model_1a.nobs,
         model_1b.nobs,
         model_1c.nobs,
+        model_1d.nobs,
         model_2.nobs,
         model_3.nobs,
         model_4.nobs,
@@ -551,12 +620,14 @@ print(f"   Original model: {coef_1a:.2f} units per $1k subsidy")
 print(f"   With fuel prices: {coef_1b:.2f} units per $1k subsidy")
 
 print(f"\n6. POLICY TIMING WITH LAGGED SUBSIDIES:")
-print(f"   Lagged 3-month avg subsidy coefficient: {coef_1c:.1f} (p={pval_1c:.4f})")
-print(f"   Lagged model R²: {rsq_1c:.4f} using {model_1c.nobs} observations")
-if coef_1c > coef_1b:
-    print("   → Stronger lagged effect suggests shipments respond with implementation delays")
+print(f"   1-month lag coefficient: {coef_1d:.1f} (p={pval_1d:.4f}), R²={rsq_1d:.4f}")
+print(f"   3-month avg coefficient: {coef_1c:.1f} (p={pval_1c:.4f}), R²={rsq_1c:.4f} using {model_1c.nobs} observations")
+if coef_1d > coef_1c and coef_1d < coef_1b:
+    print("   → Peak response arrives shortly after policy change (within a month)")
+elif coef_1d >= coef_1b:
+    print("   → Subsidy impact is effectively contemporaneous with policy timing")
 else:
-    print("   → Similar or smaller lagged effect suggests faster subsidy pass-through")
+    print("   → Smaller first-month response points to longer implementation frictions")
 
 print("\n" + "="*70)
 print("BOTTOM LINE:")
