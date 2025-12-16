@@ -267,7 +267,7 @@ df_lag_1m = df_panel.sort_index().copy()
 df_lag_1m['lagged_subsidy_k_1m'] = (
     df_lag_1m.groupby(level='province')['total_baseline_subsidy_k']
     .shift(1)
-    .reset_index(level=0, drop=True)
+    .to_numpy()
 )
 
 lagged_1m_cols = [
