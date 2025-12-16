@@ -23,7 +23,7 @@ print("="*70)
 print("\n1. Loading heat pump panel with fuel prices...")
 
 # Load the panel data with fuel prices
-df = pd.read_csv('heat_pump_panel_with_fuel_prices.csv')
+df = pd.read_csv('heat_pump_panel_final_with_real_fuel_prices.csv')
 
 print(f"   ✓ Loaded {len(df):,} observations")
 print(f"   Provinces: {df['province'].nunique()}")
@@ -644,4 +644,5 @@ print("  ✓ Tells richer policy story (subsidies + market signals)")
 
 print("\n" + "="*70)
 print("✓ ANALYSIS COMPLETE")
+
 print("="*70)
