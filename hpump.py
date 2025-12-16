@@ -264,11 +264,14 @@ print("MODEL 1D: 1-MONTH LAGGED SUBSIDY WITH FUEL PRICES")
 print("="*70)
 
 df_lag_1m = df_panel.sort_index().copy()
-df_lag_1m['lagged_subsidy_k_1m'] = (
-    df_lag_1m.groupby(level='province')['total_baseline_subsidy_k']
+# Reset the index to avoid duplicate-label issues during assignment, then restore
+# the panel structure.
+df_lag_1m_reset = df_lag_1m.reset_index()
+df_lag_1m_reset['lagged_subsidy_k_1m'] = (
+    df_lag_1m_reset.groupby('province')['total_baseline_subsidy_k']
     .shift(1)
-    .to_numpy()
 )
+df_lag_1m = df_lag_1m_reset.set_index(['province', 'yearmonth'])
 
 lagged_1m_cols = [
     'lagged_subsidy_k_1m',
