@@ -398,7 +398,7 @@ print("MODEL 4: ATLANTIC CANADA ANALYSIS (Oil-Heated Region)")
 print("="*70)
 
 # Create Atlantic indicator
-df_panel['is_atlantic'] = (df_panel.index.get_level_values('province') == 'Nova Scotia').astype(int)
+df_panel['is_atlantic'] = (df_panel.index.get_level_values('province') == 'Atlantic').astype(int)
 df_panel['oil_x_atlantic'] = df_panel['oil_to_electric_ratio'] * df_panel['is_atlantic']
 
 exog_4 = df_panel[['total_baseline_subsidy_k', 
@@ -646,5 +646,6 @@ print("\n" + "="*70)
 print("✓ ANALYSIS COMPLETE")
 
 print("="*70)
+
 
 
