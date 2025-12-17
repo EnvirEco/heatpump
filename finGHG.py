@@ -181,7 +181,7 @@ df_output.to_csv("heat_pump_household_benefits_2023.csv", index=False)
 print("="*100)
 print("HOUSEHOLD BENEFITS FROM HEAT PUMP SUBSIDIES (2023 Fuel Mix)")
 print("="*100)
-print(df_output.to_markdown(index=False))
+print(df_output.to_string(index=False))
 
 print("\n\n" + "="*100)
 print("SUMMARY STATISTICS")
@@ -201,4 +201,5 @@ print(f"  Lifetime GHG:      {df_output['Lifetime_GHG_kg'].min():,.0f} to {df_ou
 
 print("\n" + "="*100)
 print("Saved to: heat_pump_household_benefits_2023.csv")
+
 print("="*100)
